@@ -2934,25 +2934,31 @@ async function publishToPI(){
     files:{'labdaily-pi.json':{content:JSON.stringify(payload,null,2)}}
   };
 
+  const createGist=()=>fetch('https://api.github.com/gists',{
+    method:'POST',
+    headers:{'Authorization':'token '+token,'Content-Type':'application/json'},
+    body:JSON.stringify(gistBody)
+  });
+
   try{
     let res, data;
     if(c.gistId){
-      // Update existing gist
+      // Try to update existing gist; fall back to create if not found
       res=await fetch(`https://api.github.com/gists/${c.gistId}`,{
         method:'PATCH',
         headers:{'Authorization':'token '+token,'Content-Type':'application/json'},
         body:JSON.stringify(gistBody)
       });
+      if(res.status===404){
+        // Stale gistId — create a new one
+        const cfg0={...c,gistId:''};DB.s('cfg',cfg0);
+        res=await createGist();
+      }
     } else {
-      // Create new gist
-      res=await fetch('https://api.github.com/gists',{
-        method:'POST',
-        headers:{'Authorization':'token '+token,'Content-Type':'application/json'},
-        body:JSON.stringify(gistBody)
-      });
+      res=await createGist();
     }
     data=await res.json();
-    if(!res.ok)throw new Error(data.message||'GitHub API error');
+    if(!res.ok)throw new Error(data.message||'GitHub API error ('+res.status+'). Make sure your token has the "gist" scope.');
 
     const gistId=data.id;
     const cfg0={...c,gistId};
