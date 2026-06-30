@@ -2251,7 +2251,9 @@ function renderTodayDetails(){
     <!-- Meta -->
     <div class="card mb3" style="padding:10px 16px">
       <div class="flex ic g4u" style="flex-wrap:wrap">
-        <span class="xs muted">📅 ${fd(td)}</span>
+        <label class="flex ic g2u xs muted" style="cursor:pointer" title="Click to change date">
+          📅 <input type="date" id="td-date-inp" value="${td}" style="border:none;background:transparent;font-size:11px;color:var(--text2);cursor:pointer;font-family:inherit;padding:0;width:110px" onchange="tdChangeDate(this.value,'${rec.id}')">
+        </label>
         <span class="xs muted">👤 ${esc(cfg0.name)}</span>
         <span class="xs muted">🏛 ${esc(cfg0.lab)}</span>
         <span id="td-save-st" class="xs muted" style="margin-left:auto">All changes saved</span>
@@ -2406,6 +2408,29 @@ function renderTodayDetails(){
 
   </div>
 </div>`);
+}
+
+// ── Change date of a Details record ──
+function tdChangeDate(newDate, recId){
+  if(!newDate||!recId)return;
+  const existing=DB.list('records').find(r=>r.date===newDate&&r.id!==recId);
+  if(existing){
+    if(!confirm(`A record already exists for ${fd(newDate)}. Move details to that record instead?`))return;
+    // Merge elnDetail into existing record
+    const editor=document.getElementById('td-editor');
+    const content=editor?editor.innerHTML:DB.find('records',recId)?.elnDetail||'';
+    DB.upd('records',existing.id,{elnDetail:content,updatedAt:Date.now()});
+    DB.del('records',recId);
+    toast('Moved to '+fd(newDate));
+    go('todaydetails',newDate);
+    return;
+  }
+  DB.upd('records',recId,{date:newDate,updatedAt:Date.now()});
+  toast('Date changed to '+fd(newDate));
+  // Update topbar title without re-rendering
+  const tb=document.querySelector('.topbar-title');
+  if(tb)tb.textContent='Today Details — '+fd(newDate);
+  CUR_SUB=newDate;
 }
 
 // ── Toggle project link from Today Details sidebar ──
