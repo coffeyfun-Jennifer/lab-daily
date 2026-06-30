@@ -379,22 +379,25 @@ function go(page,sub=''){
 // ══════════════════════════════
 function renderToday(){
   const cfg0=cfg();
-  const td=today();
+  const td=CUR_SUB||today();
+  const isToday=td===today();
   const rec=DB.list('records').find(r=>r.date===td);
   const projects=DB.list('projects');
 
-  setTB('Today — '+fd(td),`
-    <button class="btn btn-secondary btn-sm" onclick="exportPrint()">⬇ Export PDF</button>
-    <button class="btn btn-secondary btn-sm" onclick="openShareModal()" title="Share records with PI">🔗 Share with PI</button>
-    <button class="btn btn-primary btn-sm" onclick="openRecModal('${td}')">${rec?'✎ Edit Record':'+ New Record'}</button>
+  setTB((isToday?'Today':'Summary')+' — '+fd(td),`
+    ${!isToday?`<button class="btn btn-secondary btn-sm" onclick="go('records')">← Calendar</button>`:''}
+    <button class="btn btn-secondary btn-sm" onclick="go('todaydetails','${td}')">📝 View Details</button>
+    ${isToday?`<button class="btn btn-secondary btn-sm" onclick="openShareModal()" title="Share records with PI">🔗 Share with PI</button>`:''}
+    <button class="btn btn-primary btn-sm" onclick="openRecModal('${td}')">${rec?'✎ Edit':'+ New Record'}</button>
   `);
 
   if(!rec){
     pg(`<div style="text-align:center;padding:70px 20px">
       <div style="font-size:56px;margin-bottom:16px">🧪</div>
-      <h2 style="font-size:19px;font-weight:700;margin-bottom:6px">No record for today</h2>
-      <p class="muted mb4">${fd(td)} — Start documenting your experiments</p>
-      <button class="btn btn-primary" onclick="openRecModal('${td}')">+ Create Today's Record</button>
+      <h2 style="font-size:19px;font-weight:700;margin-bottom:6px">No record for ${isToday?'today':fd(td)}</h2>
+      <p class="muted mb4">${isToday?'Start documenting your experiments':'Add a record for this date'}</p>
+      <button class="btn btn-primary" onclick="openRecModal('${td}')">+ Create Record</button>
+      ${!isToday?`<br><br><button class="btn btn-secondary btn-sm" onclick="go('todaydetails','${td}')">📝 Or add to Details directly</button>`:''}
     </div>`);
     return;
   }
@@ -623,9 +626,7 @@ function renderRecords(){
 }
 
 function openDay(ds){
-  if(ds===today()){go('today');return}
-  const rec=DB.list('records').find(r=>r.date===ds);
-  if(!rec){openRecModal(ds)}else showRecDetail(rec);
+  go('today',ds);
 }
 
 function showRecDetail(rec){
