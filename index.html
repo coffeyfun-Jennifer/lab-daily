@@ -644,9 +644,15 @@ function renderRecords(){
           <button class="btn btn-secondary btn-sm" onclick="openRecModal('${r.date}')">✎ Edit</button>
         </div>
       </div>
-      <div style="padding:14px 16px">
-        ${r.summary?`<div class="mb3"><div class="xs muted mb1" style="font-weight:700;text-transform:uppercase;letter-spacing:.06em">Summary</div><div style="font-size:13px;color:var(--text2);white-space:pre-wrap;line-height:1.7">${esc(r.summary)}</div></div>`:'<p class="sm muted mb2">No summary — <a href="#" onclick="event.preventDefault();openRecModal(\''+r.date+'\')" style="color:var(--primary)">Add one</a></p>'}
-        ${piC?`<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:10px 12px;margin-top:6px"><div class="xs muted mb1" style="font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#16a34a">💬 PI Comment</div><div style="font-size:13px;color:var(--text2);white-space:pre-wrap">${esc(piC.text)}</div></div>`:''}
+      <div style="padding:14px 16px;display:flex;gap:14px">
+        <div style="flex:1;min-width:0">
+          <div class="xs muted mb1" style="font-weight:700;text-transform:uppercase;letter-spacing:.06em">Summary</div>
+          ${r.summary?`<div style="font-size:13px;color:var(--text2);white-space:pre-wrap;line-height:1.7">${esc(r.summary)}</div>`:`<p class="sm muted">No summary — <a href="#" onclick="event.preventDefault();openRecModal('${r.date}')" style="color:var(--primary)">Add one</a></p>`}
+        </div>
+        <div style="width:220px;flex-shrink:0;border-left:1px solid var(--border);padding-left:14px">
+          <div class="xs mb1" style="font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#16a34a">💬 PI Comment</div>
+          ${piC?`<div style="font-size:13px;color:var(--text2);white-space:pre-wrap;line-height:1.6">${esc(piC.text)}</div>`:`<p class="sm muted" style="font-style:italic">No comment yet</p>`}
+        </div>
       </div>
     </div>`;
   }).join('');
