@@ -2977,16 +2977,8 @@ function openShareModal(){
         </div>
       </div>
 
-      ${atts.length ? `<div class="fg mt3">
-        <label class="fl">Files to share — optional (Dr. Liu can download these)</label>
-        <div style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--r);padding:6px">
-          ${atts.slice(0,50).map(a=>`
-            <label style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;cursor:pointer">
-              <input type="checkbox" class="sh-att-cb" value="${a.id}">
-              <span style="font-size:12px">${esc(a.name||a.filename||'File')}</span>
-              <span class="xs muted">${fd(a.date||'')}</span>
-            </label>`).join('')}
-        </div>
+      ${atts.length ? `<div class="mt3 p2" style="background:var(--surface2);border-radius:var(--r);border:1px solid var(--border)">
+        <p class="xs muted"><strong>📎 ${atts.length} file${atts.length!==1?'s':''}</strong> will be included automatically for Dr. Liu to download.</p>
       </div>` : ''}
 
       <div id="sh-status" class="mt3"></div>
@@ -3004,11 +2996,10 @@ async function publishToPI(){
   if(!token){toast('No GitHub token found','t-err');return;}
 
   const selRecIds=new Set([...document.querySelectorAll('.sh-rec-cb:checked')].map(cb=>cb.value));
-  const selAttIds=new Set([...document.querySelectorAll('.sh-att-cb:checked')].map(cb=>cb.value));
 
   const records=DB.list('records').filter(r=>selRecIds.has(r.id));
   const projects=DB.list('projects');
-  const atts=DB.list('atts').filter(a=>selAttIds.has(a.id));
+  const atts=DB.list('atts'); // all files included automatically
 
   const status=document.getElementById('sh-status');
   status.innerHTML='<p class="sm" style="color:var(--primary)">⏳ Publishing…</p>';
