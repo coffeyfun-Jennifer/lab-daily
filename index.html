@@ -3004,13 +3004,17 @@ async function publishToPI(){
   const status=document.getElementById('sh-status');
   status.innerHTML='<p class="sm" style="color:var(--primary)">⏳ Publishing…</p>';
 
-  // Strip large base64 data from atts to keep Gist small; keep metadata + small files only
-  const sharedFiles=atts.map(a=>({
-    id:a.id, name:a.name||a.filename||'File', date:a.date||'',
-    type:a.type||'', size:a.size||0,
-    // include data only if < 500KB
-    data:(a.data&&a.data.length<700000)?a.data:null
-  }));
+  // Resolve actual file data from the files table (atts store a fileId pointer)
+  const sharedFiles=atts.map(a=>{
+    const fileRec=DB.find('files',a.fileId);
+    const data=fileRec?.data||null;
+    return{
+      id:a.id, name:a.name||'File', date:a.date||'',
+      type:a.fileType||a.type||'', size:a.size||0,
+      // include base64 data only if under ~700KB to stay within Gist limits
+      data:(data&&data.length<950000)?data:null
+    };
+  });
 
   const payload={
     researcher:c.name||'',
