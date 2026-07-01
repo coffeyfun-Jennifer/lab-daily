@@ -580,49 +580,124 @@ function renderProjectDetail(p){
 // ══════════════════════════════
 //  PAGE: RECORDS (calendar)
 // ══════════════════════════════
+let REC_YR=new Date().getFullYear(), REC_MO=new Date().getMonth();
+
 function renderRecords(){
-  setTB('Daily Records',`<button class="btn btn-primary btn-sm" onclick="openRecModal()">+ New Record</button>`);
+  const yr=REC_YR, mo=REC_MO;
   const records=DB.list('records');
-  const recDates=new Set(records.map(r=>r.date));
-  const now=new Date();const yr=now.getFullYear(),mo=now.getMonth();
   const MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  // All year-months that have records, sorted desc
+  const ymSet=new Set(records.map(r=>r.date.slice(0,7)));
+  const ymList=[...ymSet].sort().reverse();
+
+  // Records for current month
+  const yrStr=String(yr);
+  const moStr=String(mo+1).padStart(2,'0');
+  const monthKey=`${yrStr}-${moStr}`;
+  const monthRecs=records.filter(r=>r.date.startsWith(monthKey)).sort((a,b)=>a.date.localeCompare(b.date));
+  const recByDate={};records.forEach(r=>recByDate[r.date]=r);
+
+  // Calendar
   const first=new Date(yr,mo,1).getDay();
   const dim=new Date(yr,mo+1,0).getDate();
   let cal='';
   ['Su','Mo','Tu','We','Th','Fr','Sa'].forEach(d=>cal+=`<div class="cal-h">${d}</div>`);
   for(let i=0;i<first;i++)cal+=`<div class="cal-d dim"></div>`;
   for(let d=1;d<=dim;d++){
-    const ds=`${yr}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const isTd=ds===today(),hasR=recDates.has(ds);
-    cal+=`<div class="cal-d ${isTd?'today':hasR?'has':''}" onclick="openDay('${ds}')">
+    const ds=`${yrStr}-${moStr}-${String(d).padStart(2,'0')}`;
+    const isTd=ds===today(),hasR=!!recByDate[ds];
+    cal+=`<div class="cal-d ${isTd?'today':hasR?'has':''}" onclick="openDay('${ds}')" title="${hasR?(recByDate[ds].summary||'').slice(0,60):'No record'}">
       <div style="font-weight:${hasR||isTd?700:400}">${d}</div>
       ${hasR&&!isTd?'<div style="font-size:8px;margin-top:2px">●</div>':''}
     </div>`;
   }
 
-  pg(`<div class="g2">
-    <div><div class="card mb4">
-      <div class="ch"><div class="card-title">${MN[mo]} ${yr}</div></div>
-      <div class="cal">${cal}</div>
-      <div class="flex mt3 g4u xs muted ic">
-        <span style="color:var(--primary)">■ Has record</span><span>Click day to open/create</span>
+  // Month selector tabs (year-month groups)
+  const tabs=ymList.map(ym=>{
+    const [y,m]=ym.split('-');
+    const label=`${MN[parseInt(m)-1].slice(0,3)} ${y}`;
+    const active=ym===monthKey;
+    return`<div class="tab ${active?'on':''}" onclick="REC_YR=${y};REC_MO=${parseInt(m)-1};renderRecords()">${label}</div>`;
+  }).join('');
+
+  // Day list for this month
+  const piCmts=DB.list('cmts').filter(c=>c.role==='pi');
+  const piByRec={};piCmts.forEach(c=>{ if(!piByRec[c.recId])piByRec[c.recId]=[]; piByRec[c.recId].push(c); });
+
+  const dayList=monthRecs.map(r=>{
+    const d=new Date(r.date+'T12:00:00');
+    const piC=(piByRec[r.id]||[]).slice(-1)[0];
+    const linkedProjs=(r.projIds||[]).map(id=>DB.find('projects',id)).filter(Boolean);
+    return`<div class="card mb3" style="padding:0;overflow:hidden">
+      <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--surface2)">
+        <div class="flex ic g2u">
+          <div style="font-size:22px;font-weight:800;color:var(--primary);min-width:28px;text-align:center">${d.getDate()}</div>
+          <div>
+            <div style="font-weight:700;font-size:13px">${['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()]}, ${MN[d.getMonth()]} ${d.getDate()}</div>
+            <div class="flex ic g2u mt1">${linkedProjs.map(p=>`<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px;color:${p.color};font-weight:600"><span style="width:6px;height:6px;border-radius:50%;background:${p.color};display:inline-block"></span>${esc(p.name)}</span>`).join('')}</div>
+          </div>
+        </div>
+        <div class="flex ic g2u">
+          <button class="btn btn-secondary btn-sm" onclick="go('todaydetails','${r.date}')">📝 Details</button>
+          <button class="btn btn-secondary btn-sm" onclick="openRecModal('${r.date}')">✎ Edit</button>
+        </div>
       </div>
-    </div></div>
-    <div><div class="card">
-      <div class="card-title mb3">All Records (${records.length})</div>
-      ${records.slice().reverse().map(r=>`
-        <div class="fi-row" style="cursor:pointer" onclick="openDay('${r.date}')">
-          <div style="text-align:center;min-width:38px">
-            <div style="font-size:15px;font-weight:800;color:var(--primary)">${new Date(r.date+'T12:00:00').getDate()}</div>
-            <div class="xs muted">${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][new Date(r.date+'T12:00:00').getMonth()]}</div>
+      <div style="padding:14px 16px">
+        ${r.summary?`<div class="mb3"><div class="xs muted mb1" style="font-weight:700;text-transform:uppercase;letter-spacing:.06em">Summary</div><div style="font-size:13px;color:var(--text2);white-space:pre-wrap;line-height:1.7">${esc(r.summary)}</div></div>`:'<p class="sm muted mb2">No summary — <a href="#" onclick="event.preventDefault();openRecModal(\''+r.date+'\')" style="color:var(--primary)">Add one</a></p>'}
+        ${piC?`<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:10px 12px;margin-top:6px"><div class="xs muted mb1" style="font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#16a34a">💬 PI Comment</div><div style="font-size:13px;color:var(--text2);white-space:pre-wrap">${esc(piC.text)}</div></div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+
+  setTB('Daily Records',`<button class="btn btn-primary btn-sm" onclick="openRecModal()">+ New Record</button>`);
+
+  pg(`
+    <div style="display:flex;gap:16px;align-items:flex-start">
+
+      <!-- Left: calendar + month nav -->
+      <div style="width:260px;flex-shrink:0">
+        <div class="card mb3">
+          <div class="flex ic jb mb3">
+            <button class="btn btn-secondary btn-sm" onclick="REC_MO--;if(REC_MO<0){REC_MO=11;REC_YR--}renderRecords()">‹</button>
+            <div style="font-weight:700;font-size:13px">${MN[mo]} ${yr}</div>
+            <button class="btn btn-secondary btn-sm" onclick="REC_MO++;if(REC_MO>11){REC_MO=0;REC_YR++}renderRecords()">›</button>
           </div>
-          <div class="fi-info">
-            <div class="fi-name">${esc((r.summary||'No summary').slice(0,60))}</div>
-            <div class="fi-meta">${(r.experiments||[]).length} experiments · ${r.piReviewed?'✅':'⏳'}</div>
+          <div class="cal">${cal}</div>
+          <div class="flex mt3 g4u xs muted ic">
+            <span style="color:var(--primary)">■</span><span>Has record · Click to open</span>
           </div>
-        </div>`).join('')||'<p class="sm muted">No records yet.</p>'}
-    </div></div>
-  </div>`);
+        </div>
+
+        <!-- Month index -->
+        <div class="card">
+          <div class="card-title mb2">All Months</div>
+          ${ymList.length
+            ? `<div style="display:flex;flex-direction:column;gap:2px">${ymList.map(ym=>{
+                const [y,m]=ym.split('-');
+                const cnt=records.filter(r=>r.date.startsWith(ym)).length;
+                const active=ym===monthKey;
+                return`<div onclick="REC_YR=${y};REC_MO=${parseInt(m)-1};renderRecords()" style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-radius:6px;cursor:pointer;background:${active?'var(--primary-light)':'transparent'};color:${active?'var(--primary)':'var(--text2)'};font-weight:${active?700:400};font-size:13px">
+                  <span>${MN[parseInt(m)-1]} ${y}</span>
+                  <span class="xs muted">${cnt} day${cnt!==1?'s':''}</span>
+                </div>`;
+              }).join('')}</div>`
+            : '<p class="sm muted">No records yet.</p>'
+          }
+        </div>
+      </div>
+
+      <!-- Right: day-by-day list -->
+      <div style="flex:1;min-width:0">
+        <div class="flex ic jb mb3">
+          <div style="font-size:15px;font-weight:700">${MN[mo]} ${yr} <span class="xs muted" style="font-weight:400">${monthRecs.length} record${monthRecs.length!==1?'s':''}</span></div>
+        </div>
+        ${dayList||`<div class="card" style="text-align:center;padding:40px"><p class="muted">No records for ${MN[mo]} ${yr}.</p><button class="btn btn-primary btn-sm mt3" onclick="openRecModal()">+ Add Record</button></div>`}
+      </div>
+
+    </div>
+  `);
 }
 
 function openDay(ds){
