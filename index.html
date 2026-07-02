@@ -2937,14 +2937,16 @@ const RENDER={
   document.getElementById('uavatar').textContent=(c.name||'R')[0].toUpperCase();
   document.getElementById('urole').textContent=c.role||'Lab Member';
 
-  // Seed demo projects if empty
+  // Seed one generic example project if empty, just to show the format —
+  // not tied to any specific research area, so it makes sense for anyone
+  // deploying their own copy of this site.
   if(!DB.list('projects').length){
-    [{name:'EV / Exosome',category:'EV / Exosome',color:'#2563eb',tags:['EV','CD9','exosome','HeLa'],description:'Investigating extracellular vesicle biology and EV-mediated signaling pathways.'},
-     {name:'Integrin',category:'Cell Biology',color:'#16a34a',tags:['integrin','adhesion','ECM'],description:'Integrin signaling and cell-matrix interaction studies.'},
-     {name:'PLA Assay',category:'Immunofluorescence / PLA',color:'#9333ea',tags:['PLA','proximity ligation','IF'],description:'Proximity ligation assay for protein-protein interaction detection.'},
-     {name:'HiBiT / SLEEQ',category:'HiBiT / SLEEQ',color:'#ea580c',tags:['HiBiT','SLEEQ','luciferase','bioluminescence'],description:'HiBiT-based SLEEQ assay for quantitative protein analysis.'},
-     {name:'Western Blot',category:'Western Blot',color:'#0891b2',tags:['WB','Western blot','antibody'],description:'Protein expression analysis by Western blotting.'}
-    ].forEach(p=>DB.push('projects',{...p,id:uid(),status:'active',createdAt:Date.now()}));
+    DB.push('projects',{
+      name:'Example Project (edit or delete me)',category:'Other',color:'#2563eb',
+      tags:['example'],
+      description:'This is a sample project so you can see how project cards look. Rename or delete it, then use "+ New Project" to add your own.',
+      id:uid(),status:'active',createdAt:Date.now()
+    });
   }
 
   refreshProjSubnav();
