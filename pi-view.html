@@ -225,9 +225,11 @@ async function load(){
 
 // ── TODAY SUMMARY ──
 function renderToday(){
-  const td=today();
+  // Show the most recently published record, not whatever matches the PI's
+  // real wall-clock date — otherwise the view silently jumps to a newer
+  // (possibly still-empty) day as soon as one exists, even mid-edit.
   const records=(DATA.records||[]).sort((a,b)=>b.date.localeCompare(a.date));
-  const rec=records.find(r=>r.date===td)||records[0];
+  const rec=records[0];
   const pg=document.getElementById('content');
   if(!rec){pg.innerHTML=`<div class="card"><p class="muted">No records published yet.</p></div>`;return}
 
@@ -287,10 +289,11 @@ function renderToday(){
           ${cmt?`<div class="cmt-saved"><div class="cmt-meta">Last saved ${new Date(cmt.updatedAt).toLocaleString()}</div>${esc(cmt.text)}</div>`:''}
           <textarea class="ft" id="cmt-today" placeholder="Leave feedback, suggestions, or approval…">${esc(cmt?.text||'')}</textarea>
           <div class="flex g2u mt2">
-            <button class="btn btn-primary btn-sm" onclick="submitCmt('${rec.id}','cmt-today','cmt-today-st')">💾 Save</button>
-            <button class="btn btn-secondary btn-sm" onclick="emailCmt('${rec.id}','cmt-today','${esc(DATA.email)}','${esc(fd(rec.date))}')">📧 Email</button>
+            <button class="btn btn-primary btn-sm" onclick="emailCmt('${rec.id}','cmt-today','${esc(DATA.email)}','${esc(fd(rec.date))}')">📧 Email to researcher</button>
+            <button class="btn btn-secondary btn-sm" onclick="submitCmt('${rec.id}','cmt-today','cmt-today-st')">💾 Save draft</button>
             <span class="xs muted" id="cmt-today-st"></span>
           </div>
+          <p class="xs muted mt2">⚠️ "Save draft" only keeps your comment in this browser — click <strong>Email to researcher</strong> so they actually see it.</p>
         </div>
 
         <!-- Recent records mini list -->
@@ -312,12 +315,14 @@ function renderToday(){
 
 // ── TODAY DETAILS ──
 function renderTodayDetail(){
-  const td=today();
   const records=(DATA.records||[]).sort((a,b)=>b.date.localeCompare(a.date));
-  const rec=records.find(r=>r.date===td)||records[0];
+  // Most recent record that actually has detail content — a newer, still-empty
+  // day shouldn't hide the last real entry (e.g. don't drop from Jul 1 to a
+  // blank Jul 2 just because a new day started).
+  const rec=records.find(r=>r.elnDetail)||records[0];
   const pg=document.getElementById('content');
   if(!rec||!rec.elnDetail){
-    pg.innerHTML=`<div class="card"><p class="muted">No detailed notes published yet for today. Check back after the researcher adds Today Details.</p></div>`;
+    pg.innerHTML=`<div class="card"><p class="muted">No detailed notes published yet. Check back after the researcher adds Today Details.</p></div>`;
     return;
   }
   const cmts=getCmts();
@@ -349,10 +354,11 @@ function renderTodayDetail(){
       ${cmt?`<div class="cmt-saved"><div class="cmt-meta">Last saved ${new Date(cmt.updatedAt).toLocaleString()}</div>${esc(cmt.text)}</div>`:''}
       <textarea class="ft" id="cmt-detail" placeholder="Comments on the detailed notes…">${esc(cmt?.text||'')}</textarea>
       <div class="flex g2u mt2">
-        <button class="btn btn-primary btn-sm" onclick="submitCmt('${rec.id}_detail','cmt-detail','cmt-detail-st')">💾 Save</button>
-        <button class="btn btn-secondary btn-sm" onclick="emailCmt('${rec.id}_detail','cmt-detail','${esc(DATA.email)}','Details — ${esc(fd(rec.date))}')">📧 Email</button>
+        <button class="btn btn-primary btn-sm" onclick="emailCmt('${rec.id}_detail','cmt-detail','${esc(DATA.email)}','Details — ${esc(fd(rec.date))}')">📧 Email to researcher</button>
+        <button class="btn btn-secondary btn-sm" onclick="submitCmt('${rec.id}_detail','cmt-detail','cmt-detail-st')">💾 Save draft</button>
         <span class="xs muted" id="cmt-detail-st"></span>
       </div>
+      <p class="xs muted mt2">⚠️ "Save draft" only keeps your comment in this browser — click <strong>Email to researcher</strong> so they actually see it.</p>
     </div>`;
 }
 
@@ -453,10 +459,11 @@ function showProject(pid){
         ${cmt?`<div class="cmt-saved"><div class="cmt-meta">Last saved ${new Date(cmt.updatedAt).toLocaleString()}</div>${esc(cmt.text)}</div>`:''}
         <textarea class="ft" id="cmt-proj-${pid}" placeholder="Overall feedback on this project…">${esc(cmt?.text||'')}</textarea>
         <div class="flex g2u mt2">
-          <button class="btn btn-primary btn-sm" onclick="submitCmt('proj_${pid}','cmt-proj-${pid}','cmt-proj-st-${pid}')">💾 Save</button>
-          <button class="btn btn-secondary btn-sm" onclick="emailCmt('proj_${pid}','cmt-proj-${pid}','${esc(DATA.email)}','Project: ${esc(p.name)}')">📧 Email</button>
+          <button class="btn btn-primary btn-sm" onclick="emailCmt('proj_${pid}','cmt-proj-${pid}','${esc(DATA.email)}','Project: ${esc(p.name)}')">📧 Email to researcher</button>
+          <button class="btn btn-secondary btn-sm" onclick="submitCmt('proj_${pid}','cmt-proj-${pid}','cmt-proj-st-${pid}')">💾 Save draft</button>
           <span class="xs muted" id="cmt-proj-st-${pid}"></span>
         </div>
+        <p class="xs muted mt2">⚠️ "Save draft" only keeps your comment in this browser — click <strong>Email to researcher</strong> so they actually see it.</p>
       </div>
     </div>`;
   document.getElementById('proj-detail').scrollIntoView({behavior:'smooth',block:'start'});
@@ -469,19 +476,34 @@ function piCommentWidget(key,email,dateStr,cmts){
     ${cmt?`<div class="cmt-saved"><div class="cmt-meta">Saved ${new Date(cmt.updatedAt).toLocaleString()}</div>${esc(cmt.text)}</div>`:''}
     <textarea class="ft" id="pcmt-${key}" placeholder="Feedback…" style="min-height:70px">${esc(cmt?.text||'')}</textarea>
     <div class="flex g2u mt2">
-      <button class="btn btn-primary btn-sm" onclick="submitCmt('${key}','pcmt-${key}','pcmt-st-${key}')">💾 Save</button>
-      <button class="btn btn-secondary btn-sm" onclick="emailCmt('${key}','pcmt-${key}','${esc(email)}','${esc(dateStr)}')">📧 Email</button>
+      <button class="btn btn-primary btn-sm" onclick="emailCmt('${key}','pcmt-${key}','${esc(email)}','${esc(dateStr)}')">📧 Email to researcher</button>
+      <button class="btn btn-secondary btn-sm" onclick="submitCmt('${key}','pcmt-${key}','pcmt-st-${key}')">💾 Save draft</button>
       <span class="xs muted" id="pcmt-st-${key}"></span>
     </div>
+    <p class="xs muted mt2">⚠️ "Save draft" only keeps your comment in this browser — click <strong>Email to researcher</strong> so they actually see it.</p>
   </div>`;
 }
 
 // ── CALENDAR ──
+let CAL_YR=null, CAL_MO=null;
+function shiftCalMonth(delta){
+  CAL_MO+=delta;
+  if(CAL_MO<0){CAL_MO=11;CAL_YR--;}
+  if(CAL_MO>11){CAL_MO=0;CAL_YR++;}
+  renderCalendar();
+}
 function renderCalendar(){
   const records=(DATA.records||[]).sort((a,b)=>b.date.localeCompare(a.date));
   const recMap={};records.forEach(r=>recMap[r.date]=r);
   const pg=document.getElementById('content');
-  const now=new Date();const yr=now.getFullYear(),mo=now.getMonth();
+  // Default to the most recent published record's month, not the viewer's
+  // real-world current month — otherwise there's no way to land on a month
+  // (e.g. June) that isn't the calendar month it happens to be right now.
+  if(CAL_YR===null){
+    const latest=records[0]?new Date(records[0].date+'T12:00:00'):new Date();
+    CAL_YR=latest.getFullYear(); CAL_MO=latest.getMonth();
+  }
+  const yr=CAL_YR, mo=CAL_MO;
   const MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
   const MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const td=today();
@@ -501,7 +523,11 @@ function renderCalendar(){
     <div class="g2">
       <div>
         <div class="card">
-          <div class="card-title">${MN[mo]} ${yr}</div>
+          <div class="flex ic jb mb2">
+            <button class="btn btn-secondary btn-sm" onclick="shiftCalMonth(-1)">‹</button>
+            <div class="card-title" style="margin:0">${MN[mo]} ${yr}</div>
+            <button class="btn btn-secondary btn-sm" onclick="shiftCalMonth(1)">›</button>
+          </div>
           <div class="cal-grid">${cal}</div>
           <p class="xs muted">Blue dates have records. Click to jump to record.</p>
         </div>
