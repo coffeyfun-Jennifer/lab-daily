@@ -1760,7 +1760,7 @@ function renderELN(sub){
   const atts=DB.list('atts').filter(a=>a.expId===expId);
 
   setTB((exp.title||'Untitled')+' — ELN',`
-    <button class="btn btn-secondary btn-sm" onclick="go('today')">← Back</button>
+    <button class="btn btn-secondary btn-sm" onclick="go('today','${rec.date}')">← Back</button>
     <button class="btn btn-secondary btn-sm" onclick="elnPrint('${recId}','${expId}')">⬇ Print / PDF</button>
     <button class="btn btn-primary btn-sm" onclick="saveELN('${recId}','${expId}')">💾 Save</button>
   `);
@@ -2124,7 +2124,7 @@ function renderDayELN(recId){
   const detail=rec.elnDetail||dayElnDefault(rec,cfg0);
 
   setTB('Daily ELN — '+fd(rec.date),`
-    <button class="btn btn-secondary btn-sm" onclick="go('today')">← Back</button>
+    <button class="btn btn-secondary btn-sm" onclick="go('today','${rec.date}')">← Back</button>
     <button class="btn btn-secondary btn-sm" onclick="dayElnPrint('${recId}')">⬇ Print / PDF</button>
     <button class="btn btn-primary btn-sm" onclick="saveDayELN('${recId}')">💾 Save</button>
   `);
@@ -2471,7 +2471,7 @@ function renderTodayDetails(sub){
   const atts=DB.list('atts').filter(a=>a.date===td&&!a.expId);
 
   setTB('Today Details — '+fd(td),`
-    <button class="btn btn-secondary btn-sm" onclick="go('today')">← Summary</button>
+    <button class="btn btn-secondary btn-sm" onclick="go('today','${td}')">← Summary</button>
     <button class="btn btn-secondary btn-sm" onclick="tdPrint('${rec.id}')">⬇ Print / PDF</button>
     ${rec.id?`<button class="btn btn-danger btn-sm" onclick="deleteTodayDetails('${rec.id}')">🗑 Delete</button>`:''}
     <button class="btn btn-primary btn-sm" onclick="tdSave('${rec.id}')">💾 Save</button>
