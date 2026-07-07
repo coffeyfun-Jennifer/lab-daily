@@ -746,7 +746,20 @@ function showRecDetail(rec){
 // ══════════════════════════════
 //  PAGE: ALL DATA ARCHIVE
 // ══════════════════════════════
+const ARCH_TYPE_TABS=[['','All'],['images','Images'],['excel','Excel/CSV'],['ppt','PPT'],['prism','Prism/RAW'],['pdf','PDF/Word'],['video','Video']];
+
 function renderArchive(sub){
+  sub=sub||'';
+  // "proj:<id>" or "proj:<id>|<typeFilter>" routes into the project-folder view
+  if(sub.startsWith('proj:')){
+    const rest=sub.slice(5);
+    const bar=rest.indexOf('|');
+    const projId=bar===-1?rest:rest.slice(0,bar);
+    const typeFilter=bar===-1?'':rest.slice(bar+1);
+    renderArchiveProject(projId,typeFilter);
+    return;
+  }
+
   const allAtts=DB.list('atts');
   const projects=DB.list('projects');
   setTB('All Data',`<button class="btn btn-secondary btn-sm" onclick="openUpload()">⬆ Upload</button>`);
@@ -760,7 +773,7 @@ function renderArchive(sub){
   if(filterPrj)filtered=filtered.filter(a=>a.projId===filterPrj);
   if(filterQ)filtered=filtered.filter(a=>(a.name||'').toLowerCase().includes(filterQ)||(a.description||'').toLowerCase().includes(filterQ)||(a.tags||[]).some(t=>t.toLowerCase().includes(filterQ)));
 
-  const tabs=[['','All'],['images','Images'],['excel','Excel/CSV'],['ppt','PPT'],['prism','Prism/RAW'],['pdf','PDF/Word'],['video','Video']];
+  const tabs=ARCH_TYPE_TABS;
 
   pg(`
     <div class="g4 mb4">
@@ -769,6 +782,23 @@ function renderArchive(sub){
       <div class="stat"><div class="stat-label">Excel/CSV</div><div class="stat-val">${allAtts.filter(a=>extGroup(a.name)==='excel').length}</div></div>
       <div class="stat"><div class="stat-label">PDFs</div><div class="stat-val">${allAtts.filter(a=>extGroup(a.name)==='pdf').length}</div></div>
     </div>
+
+    <div class="card mb4">
+      <div class="card-title mb3">📁 Browse by Project</div>
+      <div class="g3">
+        ${projects.map(p=>{
+          const cnt=allAtts.filter(a=>a.projId===p.id).length;
+          return`<div class="fi-row" style="cursor:pointer" onclick="go('archive','proj:${p.id}')">
+            <div class="ficon" style="background:${p.color}18;color:${p.color}">📁</div>
+            <div class="fi-info">
+              <div class="fi-name">${esc(p.name)}</div>
+              <div class="fi-meta">${cnt} file${cnt!==1?'s':''}</div>
+            </div>
+          </div>`;
+        }).join('')||'<p class="sm muted">No projects yet.</p>'}
+      </div>
+    </div>
+
     <div class="tabs">${tabs.map(([v,l])=>`<div class="tab ${filterSub===v?'on':''}" onclick="go('archive','${v}')">${l}</div>`).join('')}</div>
     <div class="card mb3">
       <div class="flex ic g3u" style="flex-wrap:wrap">
@@ -804,6 +834,90 @@ function renderArchive(sub){
           </tr>`;
         }).join('')}</tbody>
       </table>`:`<div style="text-align:center;padding:36px;color:var(--text3)">No files found.</div>`}
+    </div>
+  `);
+}
+
+function clearArchiveProjFilters(projId){
+  ['afp-q','afp-from','afp-to','afp-tag'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
+  renderArchiveProject(projId,'');
+}
+
+function renderArchiveProject(projId,typeFilter){
+  const p=DB.find('projects',projId);
+  if(!p){go('archive');return}
+  setTB('All Data',`<button class="btn btn-secondary btn-sm" onclick="openUpload()">⬆ Upload</button>`);
+
+  const projAtts=DB.list('atts').filter(a=>a.projId===projId);
+  typeFilter=typeFilter||document.getElementById('afp-type')?.value||'';
+  const dateFrom=document.getElementById('afp-from')?.value||'';
+  const dateTo=document.getElementById('afp-to')?.value||'';
+  const tagFilter=document.getElementById('afp-tag')?.value||'';
+  const q=document.getElementById('afp-q')?.value?.toLowerCase()||'';
+
+  let filtered=projAtts;
+  if(typeFilter)filtered=filtered.filter(a=>extGroup(a.name)===typeFilter);
+  if(dateFrom)filtered=filtered.filter(a=>a.date&&a.date>=dateFrom);
+  if(dateTo)filtered=filtered.filter(a=>a.date&&a.date<=dateTo);
+  if(tagFilter)filtered=filtered.filter(a=>(a.tags||[]).includes(tagFilter));
+  if(q)filtered=filtered.filter(a=>(a.name||'').toLowerCase().includes(q)||(a.description||'').toLowerCase().includes(q));
+
+  const allTags=[...new Set(projAtts.flatMap(a=>a.tags||[]))].sort();
+  const subKey=`proj:${projId}`;
+
+  pg(`
+    <div class="flex ic g2u mb3">
+      <span class="xs muted" style="cursor:pointer" onclick="go('archive')">📁 All Data</span>
+      <span class="xs muted">/</span>
+      <span class="semi" style="color:${p.color}">${esc(p.name)}</span>
+    </div>
+
+    <div class="g4 mb4">
+      <div class="stat"><div class="stat-label">Total Files</div><div class="stat-val">${projAtts.length}</div></div>
+      <div class="stat"><div class="stat-label">Images</div><div class="stat-val">${projAtts.filter(a=>extGroup(a.name)==='images').length}</div></div>
+      <div class="stat"><div class="stat-label">Tags</div><div class="stat-val">${allTags.length}</div></div>
+      <div class="stat"><div class="stat-label">Filtered</div><div class="stat-val">${filtered.length}</div></div>
+    </div>
+
+    <div class="tabs">${ARCH_TYPE_TABS.map(([v,l])=>`<div class="tab ${typeFilter===v?'on':''}" onclick="go('archive','${subKey}|${v}')">${l}</div>`).join('')}</div>
+
+    <div class="card mb3">
+      <div class="flex ic g3u" style="flex-wrap:wrap">
+        <div style="position:relative;flex:1;min-width:160px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--text3)"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input class="fi" id="afp-q" style="padding-left:32px" placeholder="Search files, descriptions..." value="${esc(q)}" oninput="renderArchiveProject('${projId}','${typeFilter}')">
+        </div>
+        <div class="flex ic g2u">
+          <label class="xs muted">From</label>
+          <input type="date" class="fi" id="afp-from" value="${esc(dateFrom)}" onchange="renderArchiveProject('${projId}','${typeFilter}')" style="width:150px">
+        </div>
+        <div class="flex ic g2u">
+          <label class="xs muted">To</label>
+          <input type="date" class="fi" id="afp-to" value="${esc(dateTo)}" onchange="renderArchiveProject('${projId}','${typeFilter}')" style="width:150px">
+        </div>
+        <select class="fs" id="afp-tag" onchange="renderArchiveProject('${projId}','${typeFilter}')" style="width:150px">
+          <option value="">All Tags</option>
+          ${allTags.map(t=>`<option value="${esc(t)}" ${tagFilter===t?'selected':''}>${esc(t)}</option>`).join('')}
+        </select>
+        ${(dateFrom||dateTo||tagFilter||q||typeFilter)?`<button class="btn btn-secondary btn-sm" onclick="clearArchiveProjFilters('${projId}')">Clear Filters</button>`:''}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ch"><div class="card-title">Files (${filtered.length})</div></div>
+      ${filtered.length?`<table class="tbl">
+        <thead><tr><th>File</th><th>Date</th><th>Tags</th><th>Size</th><th></th></tr></thead>
+        <tbody>${filtered.slice().reverse().map(a=>`<tr>
+            <td><div class="flex ic g2u">${ficon(a.name)}<div><div class="semi" style="font-size:13px">${esc(a.name)}</div><div class="xs muted">${esc(a.description||'')}</div></div></div></td>
+            <td class="xs muted">${fd(a.date)}</td>
+            <td>${(a.tags||[]).map(t=>`<span class="tag tag-gray">${t}</span>`).join(' ')}</td>
+            <td class="xs muted">${fsz(a.size)}</td>
+            <td><div class="flex ic g2u">
+              ${a.fileId?`<button class="icon-btn" onclick="dlFile('${a.fileId}')" title="Download"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="3" x2="12" y2="15"/></svg></button>`:''}
+              <button class="icon-btn" onclick="delAtt('${a.id}')" style="color:var(--danger)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2"/></svg></button>
+            </div></td>
+          </tr>`).join('')}</tbody>
+      </table>`:`<div style="text-align:center;padding:36px;color:var(--text3)">No files match these filters.</div>`}
     </div>
   `);
 }
