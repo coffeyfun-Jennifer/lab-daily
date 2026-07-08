@@ -154,6 +154,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <script>
 const params=new URLSearchParams(location.search);
 const GIST_ID=params.get('gist');
+const DROPBOX_URL=params.get('dropbox');
+// Stable key for PI comments (use dropbox URL or gist ID as namespace)
+const CMT_KEY='pi_cmts_'+(DROPBOX_URL||GIST_ID||'local');
 let DATA=null;
 let CUR='today';
 
@@ -175,9 +178,9 @@ function fmtSize(b){if(!b)return'';if(b<1024)return b+'B';if(b<1048576)return(b/
 function today(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function fileIcon(t){if(!t)return'📄';if(t.startsWith('image/'))return'🖼';if(t.includes('pdf'))return'📕';if(t.includes('word')||t.includes('document'))return'📝';if(t.includes('sheet')||t.includes('excel'))return'📊';return'📄'}
 
-// PI comments: saved in localStorage per gist
-function getCmts(){try{return JSON.parse(localStorage.getItem('pi_cmts_'+GIST_ID)||'{}')}catch{return{}}}
-function saveCmtLocal(recId,text){const all=getCmts();all[recId]={text,updatedAt:new Date().toISOString()};localStorage.setItem('pi_cmts_'+GIST_ID,JSON.stringify(all))}
+// PI comments: saved in localStorage keyed by source URL/gist
+function getCmts(){try{return JSON.parse(localStorage.getItem(CMT_KEY)||'{}')}catch{return{}}}
+function saveCmtLocal(recId,text){const all=getCmts();all[recId]={text,updatedAt:new Date().toISOString()};localStorage.setItem(CMT_KEY,JSON.stringify(all))}
 
 function go(page){
   CUR=page;
@@ -190,24 +193,37 @@ function go(page){
   renders[page]?.();
 }
 
+// Convert Dropbox share link (dl=0) to direct download URL (dl=1)
+function dropboxDirect(url){
+  return url.replace(/[?&]dl=0/,'').replace(/(\?.*)$/,'$1&dl=1').replace(/^([^?]*)$/,'$1?dl=1');
+}
+
 async function load(){
-  if(!GIST_ID){
+  if(!DROPBOX_URL && !GIST_ID){
     document.getElementById('content').innerHTML=`<div class="err-box"><h2>No link provided</h2><p>Ask your researcher to re-send the PI view link.</p></div>`;
     return;
   }
   try{
-    const res=await fetch(`https://api.github.com/gists/${GIST_ID}`);
-    if(!res.ok)throw new Error('Could not load (HTTP '+res.status+')');
-    const gist=await res.json();
-    const fileObj=gist.files['labdaily-pi.json'];
-    if(!fileObj)throw new Error('Data file not found');
-    // The Gist API truncates file content around ~1MB; large published
-    // datasets (with embedded attachment previews) need the raw file instead.
-    let raw=fileObj.content;
-    if(fileObj.truncated){
-      const rawRes=await fetch(fileObj.raw_url);
-      if(!rawRes.ok)throw new Error('Could not load full data (HTTP '+rawRes.status+')');
-      raw=await rawRes.text();
+    let raw;
+    if(DROPBOX_URL){
+      // Load from Dropbox direct download
+      const directUrl=dropboxDirect(DROPBOX_URL);
+      const res=await fetch(directUrl);
+      if(!res.ok)throw new Error('Could not load from Dropbox (HTTP '+res.status+'). Make sure the file is shared publicly.');
+      raw=await res.text();
+    } else {
+      // Legacy: load from GitHub Gist
+      const res=await fetch(`https://api.github.com/gists/${GIST_ID}`);
+      if(!res.ok)throw new Error('Could not load (HTTP '+res.status+')');
+      const gist=await res.json();
+      const fileObj=gist.files['labdaily-pi.json'];
+      if(!fileObj)throw new Error('Data file not found');
+      raw=fileObj.content;
+      if(fileObj.truncated){
+        const rawRes=await fetch(fileObj.raw_url);
+        if(!rawRes.ok)throw new Error('Could not load full data (HTTP '+rawRes.status+')');
+        raw=await rawRes.text();
+      }
     }
     DATA=JSON.parse(raw);
     // Build project map
@@ -219,7 +235,7 @@ async function load(){
     go('today');
   }catch(e){
     document.getElementById('tb-title').textContent='Error';
-    document.getElementById('content').innerHTML=`<div class="err-box"><h2>❌ Could not load</h2><p style="color:var(--text2)">${esc(e.message)}</p><p class="sm muted mt3">The link may be expired or the researcher needs to re-publish.</p></div>`;
+    document.getElementById('content').innerHTML=`<div class="err-box"><h2>❌ Could not load</h2><p style="color:var(--text2)">${esc(e.message)}</p><p class="sm muted mt3">The link may be expired or the researcher needs to re-export and re-upload to Dropbox.</p></div>`;
   }
 }
 
