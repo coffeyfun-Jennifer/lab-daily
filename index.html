@@ -1278,18 +1278,21 @@ function renderSettings(){
     <div>
       <div class="card mb4">
         <div class="card-title mb3">🔗 PI Sharing${c.pi?` (${esc(c.pi)})`:''}</div>
-        <p class="sm muted mb3">Export your records as a file, upload it to Dropbox, then paste the Dropbox share link below so your PI can view everything.</p>
+        <p class="sm muted mb3">One click exports your records and opens your Dropbox folder — just drop the file in.</p>
         <div class="fg"><label class="fl">PI Email (for comment replies)</label>
           <input class="fi" id="s-pi-email" type="email" value="${esc(c.piEmail||'')}" placeholder="drliui@university.edu">
         </div>
-        <div class="fg"><label class="fl">Dropbox File Link <span class="xs muted">(shared link for labdaily-pi.json)</span></label>
+        <div class="fg"><label class="fl">Dropbox Folder Link <span class="xs muted">(your shared Dropbox folder)</span></label>
+          <input class="fi" id="s-dropbox-folder" type="url" value="${esc(c.dropboxFolder||'')}" placeholder="https://www.dropbox.com/scl/fo/…">
+        </div>
+        <div class="fg"><label class="fl">Dropbox File Link <span class="xs muted">(share link for labdaily-pi.json, for PI view)</span></label>
           <input class="fi" id="s-dropbox-link" type="url" value="${esc(c.dropboxLink||'')}" placeholder="https://www.dropbox.com/scl/fi/…">
         </div>
         <button class="btn btn-primary" onclick="saveProfile()">Save Settings</button>
         ${c.dropboxLink?`<div class="mt3 p3" style="background:var(--primary-light);border-radius:var(--r)">
-          <p class="sm mb2"><strong>📤 Share records with PI:</strong> go to <em>Today Summary</em> and click <strong>Share with PI</strong>.</p>
+          <p class="sm mb2"><strong>📤 Share records with PI:</strong> go to <em>Today Summary</em> → <strong>Share with PI</strong>.</p>
           <p class="sm muted">PI view link:<br><a href="${siteBaseUrl()}pi-view.html?dropbox=${encodeURIComponent(c.dropboxLink)}" target="_blank" style="word-break:break-all;color:var(--primary)">${siteBaseUrl()}pi-view.html?dropbox=…</a></p>
-        </div>`:'<p class="xs muted mt2">Add your Dropbox file link above after uploading the exported data.</p>'}
+        </div>`:''}
       </div>
       <div class="card mb4">
         <div class="card-title mb3">💾 Backup & Export</div>
@@ -1318,6 +1321,7 @@ function saveProfile(){
     email:document.getElementById('s-email').value,
     inst:document.getElementById('s-inst').value,
     piEmail:(document.getElementById('s-pi-email')||{}).value||prev.piEmail||'',
+    dropboxFolder:(document.getElementById('s-dropbox-folder')||{}).value||prev.dropboxFolder||'',
     dropboxLink:(document.getElementById('s-dropbox-link')||{}).value||prev.dropboxLink||''
   };
   DB.s('cfg',c);
@@ -3100,39 +3104,37 @@ const RENDER={
 // ══════════════════════════════
 function openShareModal(){
   const c=cfg();
-  const records=DB.list('records').sort((a,b)=>b.date.localeCompare(a.date));
+  const records=DB.list('records');
   const atts=DB.list('atts');
-  const hasDropbox=!!(c.dropboxLink);
-  const piLink=hasDropbox?`${siteBaseUrl()}pi-view.html?dropbox=${encodeURIComponent(c.dropboxLink)}`:'';
+  const piLink=c.dropboxLink?`${siteBaseUrl()}pi-view.html?dropbox=${encodeURIComponent(c.dropboxLink)}`:'';
+  const folderLink=c.dropboxFolder||'';
 
   modal(`
     <div class="mh"><h2>🔗 Share with PI</h2><button class="icon-btn" onclick="closeM()">✕</button></div>
     <div class="mb">
-      <p class="sm muted mb3">${records.length} records and ${atts.length} file${atts.length!==1?'s':''} will be exported for ${esc(c.pi||'your PI')}.</p>
+      <p class="sm muted mb3">${records.length} records · ${atts.length} file${atts.length!==1?'s':''} · for ${esc(c.pi||'your PI')}</p>
 
-      <div style="background:var(--surface2);border-radius:var(--r);border:1px solid var(--border);padding:12px;margin-bottom:12px">
-        <p class="sm mb1"><strong>How to share:</strong></p>
-        <ol class="sm muted" style="margin:0;padding-left:18px;line-height:1.8">
-          <li>Click <strong>Export JSON</strong> below to download <code>labdaily-pi.json</code></li>
-          <li>Upload it to your <a href="https://www.dropbox.com/scl/fo/5isf22e89bayzd15curlp/ADbpY8dAjREf5Ca2Qye2AWU?rlkey=89zxf7xa4flo0ik2h08ausuqt&dl=0" target="_blank" style="color:var(--primary)">Dropbox folder</a></li>
-          <li>In Dropbox, share the file → copy the file link</li>
-          <li>Paste the link in <strong>Settings → Dropbox File Link</strong></li>
-        </ol>
+      <button class="btn btn-primary" style="width:100%;font-size:15px;padding:14px;margin-bottom:12px" onclick="exportForPI()">
+        📤 Export &amp; Open Dropbox Folder
+      </button>
+
+      <div style="background:var(--surface2);border-radius:var(--r);padding:10px 12px;font-size:12px;color:var(--text2);margin-bottom:12px">
+        Downloads <code>labdaily-pi.json</code> and opens your Dropbox folder — drag the file in, then share the file link in Settings.
       </div>
 
-      ${hasDropbox?`<div style="background:var(--primary-light);border-radius:var(--r);padding:12px;margin-bottom:12px">
-        <p class="sm mb2">✅ PI view link (send to ${esc(c.pi||'your PI')}):</p>
+      ${piLink?`<div style="background:var(--primary-light);border-radius:var(--r);padding:12px">
+        <p class="sm mb2">PI view link (send to ${esc(c.pi||'your PI')}):</p>
         <div style="display:flex;gap:6px;align-items:center">
           <input class="fi" value="${piLink}" readonly style="font-size:11px;flex:1">
           <button class="btn btn-primary btn-sm" onclick="navigator.clipboard.writeText(${JSON.stringify(piLink)}).then(()=>toast('Copied!','t-ok'))">Copy</button>
         </div>
-      </div>`:'<p class="xs muted mb3" style="color:var(--warning,#d97706)">⚠️ No Dropbox link saved yet — add it in Settings after uploading.</p>'}
+      </div>`:'<p class="xs muted" style="color:var(--warning,#d97706)">⚠️ After uploading, paste the file share link in Settings → Dropbox File Link to generate the PI view link.</p>'}
 
-      <div id="sh-status"></div>
+      <div id="sh-status" class="mt3"></div>
     </div>
     <div class="mf">
-      <button class="btn btn-secondary" onclick="closeM()">Cancel</button>
-      <button class="btn btn-primary" onclick="exportForPI()">📥 Export JSON</button>
+      <button class="btn btn-secondary" onclick="closeM()">Close</button>
+      ${folderLink?`<a class="btn btn-secondary" href="${folderLink}" target="_blank">📁 Open Dropbox Folder</a>`:''}
     </div>
   `);
 }
@@ -3161,15 +3163,20 @@ function exportForPI(){
     sharedFiles
   };
 
+  // Download JSON
   const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
   a.download='labdaily-pi.json';
   a.click();
 
+  // Open Dropbox folder automatically
+  const folderLink=c.dropboxFolder||'https://www.dropbox.com';
+  setTimeout(()=>window.open(folderLink,'_blank'),400);
+
   const status=document.getElementById('sh-status');
-  if(status)status.innerHTML='<p class="sm" style="color:var(--success,#059669)">✅ Downloaded! Upload <code>labdaily-pi.json</code> to your Dropbox folder.</p>';
-  toast('Exported labdaily-pi.json','t-ok');
+  if(status)status.innerHTML='<p class="sm" style="color:var(--success,#059669)">✅ File downloaded + Dropbox folder opened. Drop <code>labdaily-pi.json</code> into the folder.</p>';
+  toast('Exported & opening Dropbox…','t-ok');
 }
 </script>
 </body>
